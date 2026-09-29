@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+}
+
+/* Hide scrollbar utility */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Print Stylesheet for Continuous Thermal Printing (Auto Length & Centered, No Top Whitespace) */
+@media print {
+  @page {
+    size: auto;
+    margin: 0mm !important; /* Menghilangkan margin putih atas dan samping */
+  }
+
+  html, body {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    display: block !important; /* Blok mencegah body memposisikan konten di bawah */
+    text-align: center !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #thermal-printable-receipt,
+  #thermal-printable-receipt * {
+    visibility: visible;
+    color: #000000 !important;
+    border-color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #thermal-printable-receipt {
+    display: block !important;
+    position: relative !important;
+    margin: 0 auto !important; /* Rata tengah kertas */
+    width: 46mm !important; /* 46mm adalah lebar cetak aman printer thermal 58mm agar teks tidak terpotong */
+    max-width: 46mm !important;
+    height: auto !important; /* Mengikuti panjang struk saja */
+    padding: 0mm 0.5mm 3mm 0.5mm !important; /* Tanpa jarak putih atas */
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 9.5px !important;
+    line-height: 1.3 !important;
+    font-family: 'Courier New', Courier, monospace !important;
+    word-break: break-word !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-inside: avoid !important;
+    break-after: avoid !important;
+  }
+
+  /* Thermal Receipt Specific Print Styling */
+  .receipt-center {
+    text-align: center !important;
+  }
+  .receipt-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    margin: 1px 0 !important;
+  }
+  .receipt-divider {
+    border-top: 1px dashed #000000 !important;
+    margin: 3px 0 !important;
+    width: 100% !important;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.15s ease-out forwards;
+}
