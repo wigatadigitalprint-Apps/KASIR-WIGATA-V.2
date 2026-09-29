@@ -261,15 +261,25 @@ export const RiwayatTab: React.FC<RiwayatTabProps> = ({
                             <span>Detail</span>
                           </button>
                           {confirmDeleteId === trx.id ? (
-                            <button
-                              onClick={() => {
-                                onDeleteTransaction(trx.id);
-                                setConfirmDeleteId(null);
-                              }}
-                              className="px-2 py-1 rounded-xl bg-red-600 text-white text-[10px] font-black cursor-pointer"
-                            >
-                              Yakin?
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => {
+                                  onDeleteTransaction(trx.id);
+                                  setConfirmDeleteId(null);
+                                }}
+                                className="px-2 py-1 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[10px] font-black cursor-pointer shadow-xs whitespace-nowrap"
+                                title="Konfirmasi hapus nota"
+                              >
+                                Ya, Hapus
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteId(null)}
+                                className="px-2 py-1 rounded-xl bg-neutral-200 hover:bg-neutral-300 text-neutral-700 text-[10px] font-bold cursor-pointer"
+                                title="Batal hapus"
+                              >
+                                Batal
+                              </button>
+                            </div>
                           ) : (
                             <button
                               onClick={() => setConfirmDeleteId(trx.id)}
@@ -319,6 +329,18 @@ export const RiwayatTab: React.FC<RiwayatTabProps> = ({
                     <span>Lunasi Tagihan</span>
                   </button>
                 )}
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Hapus permanen nota ${selectedTrx.noNota}?`)) {
+                      onDeleteTransaction(selectedTrx.id);
+                      setSelectedTrx(null);
+                    }
+                  }}
+                  className="p-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-red-100 flex items-center justify-center transition cursor-pointer"
+                  title="Hapus Nota Ini"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
                 <button
                   onClick={() => setSelectedTrx(null)}
                   className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"

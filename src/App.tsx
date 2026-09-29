@@ -35,6 +35,27 @@ import { ExcelSyncModal } from './components/ExcelSyncModal';
 import { DeployGuideModal } from './components/DeployGuideModal';
 import { CloudSyncModal } from './components/CloudSyncModal';
 
+// Helpers to permanently track user-deleted transaction IDs (preventing auto-sync resurrection)
+const getDeletedTrxIds = (): Set<string> => {
+  try {
+    const raw = localStorage.getItem('wigata_deleted_trx_ids');
+    if (raw) return new Set(JSON.parse(raw));
+  } catch {
+    // ignore
+  }
+  return new Set();
+};
+
+const markTrxAsDeleted = (id: string) => {
+  try {
+    const set = getDeletedTrxIds();
+    set.add(id);
+    localStorage.setItem('wigata_deleted_trx_ids', JSON.stringify(Array.from(set)));
+  } catch {
+    // ignore
+  }
+};
+
 export default function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<'kasir' | 'riwayat' | 'laporan' | 'katalog'>('kasir');
@@ -112,37 +133,22 @@ export default function App() {
 
     const unsubTrans = subscribeToTransactions((cloudTrans) => {
       setIsCloudSyncing(false);
-      if (cloudTrans && cloudTrans.length > 0) {
-        setTransactions(cloudTrans);
-        // Cek jika ada transaksi lokal di memori yang belum terunggah ke Cloud (misal dibuat saat offline)
-        try {
-          const localSavedRaw = localStorage.getItem('wigata_transactions');
-          if (localSavedRaw) {
-            const localSaved: Transaction[] = JSON.parse(localSavedRaw);
-            const cloudIds = new Set(cloudTrans.map((t) => t.id));
-            const unsynced = localSaved.filter((t) => !cloudIds.has(t.id));
-            if (unsynced.length > 0) {
-              console.log(`Mengunggah ${unsynced.length} transaksi lokal ke cloud...`);
-              unsynced.forEach((t) => saveTransactionToCloud(t, userEmail));
-            }
-          }
-        } catch (e) {
-          console.warn('Error checking unsynced transactions:', e);
-        }
-      } else {
-        // Jika di Cloud masih kosong (pertama kali dibuka di database baru), semai data lokal jika ada
-        try {
-          const localSavedRaw = localStorage.getItem('wigata_transactions');
-          if (localSavedRaw) {
-            const localSaved: Transaction[] = JSON.parse(localSavedRaw);
-            if (localSaved.length > 0) {
-              console.log(`Menyemai ${localSaved.length} transaksi awal ke cloud...`);
-              localSaved.forEach((t) => saveTransactionToCloud(t, userEmail));
-            }
-          }
-        } catch {
-          // ignore
-        }
+      const deletedIds = getDeletedTrxIds();
+
+      // Filter transaksi yang sudah dihapus oleh kasir
+      const validCloudTrans = (cloudTrans || []).filter((t) => !deletedIds.has(t.id));
+
+      // Jika di cloud masih ada dokumen yang sudah dihapus lokal, bersihkan dari cloud
+      const lingeringDeleted = (cloudTrans || []).filter((t) => deletedIds.has(t.id));
+      if (lingeringDeleted.length > 0) {
+        lingeringDeleted.forEach((t) => deleteTransactionFromCloud(t.id));
+      }
+
+      setTransactions(validCloudTrans);
+      try {
+        localStorage.setItem('wigata_transactions', JSON.stringify(validCloudTrans));
+      } catch {
+        // ignore
       }
     });
 
@@ -234,9 +240,11 @@ export default function App() {
   // Manual Full Cloud Sync
   const handleManualSyncAll = async () => {
     setIsCloudSyncing(true);
+    const deletedIds = getDeletedTrxIds();
     try {
       await saveAllProductsToCloud(products, userEmail);
-      for (const t of transactions) {
+      const validToSync = transactions.filter((t) => !deletedIds.has(t.id));
+      for (const t of validToSync) {
         await saveTransactionToCloud(t, userEmail);
       }
       showToast('Sinkronisasi cloud multi-PC berhasil diperbarui!');
@@ -292,9 +300,27 @@ export default function App() {
   };
 
   const handleDeleteTransaction = async (id: string) => {
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
-    await deleteTransactionFromCloud(id);
-    showToast('Transaksi dihapus dari semua komputer.');
+    // 1. Catat ke daftar ID terhapus agar tidak pernah ter-resurrect
+    markTrxAsDeleted(id);
+
+    // 2. Hapus langsung dari memori state & localStorage
+    setTransactions((prev) => {
+      const next = prev.filter((t) => t.id !== id);
+      try {
+        localStorage.setItem('wigata_transactions', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+
+    // 3. Hapus dari database Cloud Firestore
+    const ok = await deleteTransactionFromCloud(id);
+    if (ok) {
+      showToast('Nota transaksi berhasil dihapus dari Cloud & semua perangkat.');
+    } else {
+      showToast('Nota transaksi dihapus secara lokal.');
+    }
   };
 
   const handlePelunasanTransaction = async (id: string) => {
