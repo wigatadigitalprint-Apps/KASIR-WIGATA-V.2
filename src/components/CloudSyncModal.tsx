@@ -145,16 +145,35 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
             </div>
           </div>
 
-          {/* Cara Pakai di Komputer Lain */}
-          <div className="bg-blue-50/70 border border-blue-200 rounded-2xl p-4 space-y-2">
-            <div className="font-bold text-xs text-blue-950 flex items-center gap-1.5">
-              <Laptop className="w-4 h-4 text-blue-600" />
-              <span>Cara Membuka di Komputer / Laptop Lain:</span>
+          {/* Cara Pakai di HP & Komputer Lain */}
+          <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 space-y-2.5">
+            <div className="font-bold text-xs text-blue-950 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Laptop className="w-4 h-4 text-blue-600" />
+                <span>Buka di HP atau Komputer Lain:</span>
+              </div>
+              <button
+                onClick={() => {
+                  const url = window.location.href;
+                  navigator.clipboard.writeText(url);
+                  onShowToast('Link aplikasi disalin ke clipboard! Kirim ke WA untuk dibuka di HP.');
+                }}
+                className="text-[11px] bg-blue-600 hover:bg-blue-700 text-white font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition shadow-xs"
+              >
+                <ExternalLink className="w-3 h-3" />
+                <span>Salin Link Web</span>
+              </button>
             </div>
-            <ol className="text-xs text-blue-900 space-y-1 list-decimal list-inside leading-relaxed pl-1">
-              <li>Buka browser (Chrome / Edge) di komputer lain.</li>
-              <li>Ketik alamat: <span className="font-mono bg-blue-100 px-1 py-0.5 rounded text-blue-900 font-bold">https://kasirwigata.netlify.app</span></li>
-              <li>Aplikasi akan langsung membaca seluruh riwayat nota dan produk dari cloud secara otomatis!</li>
+            <ol className="text-xs text-blue-900 space-y-1.5 list-decimal list-inside leading-relaxed pl-1">
+              <li>
+                Pastikan membuka <strong>URL web aplikasi yang sama</strong> di browser Chrome/Safari pada HP atau komputer lain.
+              </li>
+              <li>
+                Begitu halaman terbuka, sistem otomatis memuat seluruh nota dan produk dari Database Cloud Firestore Wigata.
+              </li>
+              <li>
+                Setiap kali transaksi baru disimpan atau nota dilunasi di HP, layar komputer kasir akan <strong>otomatis terupdate secara langsung</strong> tanpa perlu refresh manual.
+              </li>
             </ol>
           </div>
         </div>

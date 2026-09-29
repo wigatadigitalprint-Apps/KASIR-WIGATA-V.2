@@ -104,18 +104,52 @@ export default function App() {
     testFirestoreConnection();
   }, []);
 
-  // Real-time Cloud Sync for Transactions & Products (multi-PC)
+  // Real-time Cloud Sync for Transactions & Products (multi-PC & HP)
   useEffect(() => {
     setIsCloudSyncing(true);
+
     const unsubTrans = subscribeToTransactions((cloudTrans) => {
+      setIsCloudSyncing(false);
       if (cloudTrans && cloudTrans.length > 0) {
         setTransactions(cloudTrans);
+        // Cek jika ada transaksi lokal di memori yang belum terunggah ke Cloud (misal dibuat saat offline)
+        try {
+          const localSavedRaw = localStorage.getItem('wigata_transactions');
+          if (localSavedRaw) {
+            const localSaved: Transaction[] = JSON.parse(localSavedRaw);
+            const cloudIds = new Set(cloudTrans.map((t) => t.id));
+            const unsynced = localSaved.filter((t) => !cloudIds.has(t.id));
+            if (unsynced.length > 0) {
+              console.log(`Mengunggah ${unsynced.length} transaksi lokal ke cloud...`);
+              unsynced.forEach((t) => saveTransactionToCloud(t, userEmail));
+            }
+          }
+        } catch (e) {
+          console.warn('Error checking unsynced transactions:', e);
+        }
+      } else {
+        // Jika di Cloud masih kosong (pertama kali dibuka di database baru), semai data lokal jika ada
+        try {
+          const localSavedRaw = localStorage.getItem('wigata_transactions');
+          if (localSavedRaw) {
+            const localSaved: Transaction[] = JSON.parse(localSavedRaw);
+            if (localSaved.length > 0) {
+              console.log(`Menyemai ${localSaved.length} transaksi awal ke cloud...`);
+              localSaved.forEach((t) => saveTransactionToCloud(t, userEmail));
+            }
+          }
+        } catch {
+          // ignore
+        }
       }
-      setIsCloudSyncing(false);
     });
 
-    const unsubProds = subscribeToProducts((cloudProds) => {
-      if (cloudProds && cloudProds.length > 0) {
+    const unsubProds = subscribeToProducts((cloudProds, isSnapshotEmpty) => {
+      if (isSnapshotEmpty) {
+        // Jika koleksi produk di cloud masih kosong, unggah katalog default agar HP langsung menerima
+        console.log('Database produk cloud kosong, mengunggah katalog default ke Cloud...');
+        saveAllProductsToCloud(products, userEmail);
+      } else if (cloudProds && cloudProds.length > 0) {
         setProducts(cloudProds);
       }
     });
@@ -124,7 +158,17 @@ export default function App() {
       unsubTrans();
       unsubProds();
     };
-  }, []);
+  }, [userEmail]);
+
+  // Otomatis sinkron ulang saat koneksi internet kembali aktif
+  useEffect(() => {
+    const handleOnline = () => {
+      showToast('Koneksi internet kembali online! Memeriksa sinkronisasi Cloud...');
+      handleManualSyncAll();
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [products, transactions, userEmail]);
 
   // Save changes to localStorage as offline cache
   useEffect(() => {

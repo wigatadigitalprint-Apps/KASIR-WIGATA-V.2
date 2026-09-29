@@ -76,6 +76,9 @@ export interface Transaction {
   statusBayar?: 'lunas' | 'dp';
   statusSyncExcel?: 'synced' | 'pending' | 'failed' | 'local_only';
   syncError?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 export interface PrinterConfig {

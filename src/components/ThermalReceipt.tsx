@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Transaction, PrinterConfig } from '../types';
 import { STORE_INFO, formatRupiah, formatNumber } from '../utils/defaultData';
 import { generateReceiptCanvas, getFinishingLabels } from '../utils/receiptCanvas';
+import { printerService } from '../utils/printer';
 import {
   FileText,
   Settings,
@@ -9,6 +10,9 @@ import {
   Share2,
   Copy,
   Check,
+  AlertCircle,
+  HelpCircle,
+  X,
 } from 'lucide-react';
 
 interface ThermalReceiptProps {
@@ -27,36 +31,55 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({
   const [paperWidth, setPaperWidth] = useState<58 | 80>(printerConfig.paperWidth || 58);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [hasCopiedImage, setHasCopiedImage] = useState(false);
+  const [showGuideModal, setShowGuideModal] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
 
   // Cetak Struk: Rata Tengah, Panjang Pas Menyesuaikan Isi Nota, dan Format Tabel Spasi Rapi
-  const handlePrintStruk = () => {
+  const handlePrintStruk = async () => {
+    // 1. Jika terhubung via Direct WebUSB, Bluetooth, atau Serial Kabel
+    if (printerConfig.type === 'bluetooth' || printerConfig.type === 'webusb' || printerConfig.type === 'serial') {
+      onShowToast('Mengirim perintah cetak langsung ke printer thermal...');
+      try {
+        const res = await printerService.printTransaction(transaction);
+        if (res.success) {
+          onShowToast('Struk berhasil dicetak ke printer thermal!');
+          return;
+        } else {
+          onShowToast(`Direct print: ${res.error}. Membuka dialog cetak sistem...`);
+        }
+      } catch (err) {
+        console.warn('Direct print error:', err);
+      }
+    }
+
+    // 2. Windows Spooler / System Print Mode (Dialog Browser ke Driver EPPOS 58)
     const receiptEl = receiptRef.current;
     if (!receiptEl) {
       window.print();
       return;
     }
 
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
+    try {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
 
-    const doc = iframe.contentWindow?.document;
-    if (!doc) {
-      window.print();
-      return;
-    }
+      const doc = iframe.contentWindow?.document;
+      if (!doc) {
+        window.print();
+        return;
+      }
 
-    const receiptHtml = receiptEl.innerHTML;
-    const innerContentWidthMm = paperWidth === 80 ? '70mm' : '46mm';
+      const receiptHtml = receiptEl.innerHTML;
+      const innerContentWidthMm = paperWidth === 80 ? '70mm' : '46mm';
 
-    doc.open();
-    doc.write(`<!DOCTYPE html>
+      doc.open();
+      doc.write(`<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -159,21 +182,42 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({
   </div>
 </body>
 </html>`);
-    doc.close();
+      doc.close();
 
-    setTimeout(() => {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-      setTimeout(() => {
+      // Membersihkan iframe hanya SETELAH proses cetak selesai (afterprint)
+      // Jangan pernah menghapus iframe di tengah dialog preview aktif (penyebab utama error print)
+      const cleanupIframe = () => {
         try {
-          document.body.removeChild(iframe);
+          if (iframe.parentNode) {
+            document.body.removeChild(iframe);
+          }
         } catch {
           // ignore
         }
-      }, 1500);
-    }, 200);
+      };
 
-    onShowToast('Mencetak struk (teks hitam pekat & tajam)...');
+      iframe.contentWindow?.addEventListener('afterprint', cleanupIframe);
+      // Fallback timer panjang (2 menit) jika browser tidak memicu afterprint
+      setTimeout(cleanupIframe, 120000);
+
+      setTimeout(() => {
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch (printErr) {
+          console.warn('Iframe print blocked/failed, falling back to window.print():', printErr);
+          cleanupIframe();
+          window.print();
+        }
+      }, 250);
+
+      onShowToast('Membuka dialog cetak struk...');
+    } catch (e) {
+      console.error('Print initialization error:', e);
+      // Fallback langsung ke window.print() yang aman
+      window.print();
+      onShowToast('Membuka dialog cetak struk...');
+    }
   };
 
   // Helper render struk menjadi HTML Canvas yang ultra-kompatibel di semua browser dan platform
@@ -488,6 +532,7 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({
         <div
           id="thermal-printable-receipt"
           ref={receiptRef}
+          data-paper={paperWidth}
           style={{
             width: paperWidth === 80 ? '340px' : '250px',
             fontFamily: "'Courier New', Courier, monospace",
@@ -749,8 +794,8 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({
           </button>
         </div>
 
-        {/* Tombol Cadangan: File TXT & Pengaturan Printer */}
-        <div className="flex items-center justify-between gap-2 pt-1 text-[11px]">
+        {/* Tombol Cadangan: File TXT, Pengaturan Printer & Panduan Eror */}
+        <div className="flex items-center justify-between gap-2 pt-1 text-[11px] flex-wrap">
           <button
             onClick={handleDownloadTxt}
             className="text-black/60 hover:text-black font-semibold flex items-center gap-1 py-1 cursor-pointer"
@@ -760,14 +805,119 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({
           </button>
 
           <button
+            onClick={() => setShowGuideModal(true)}
+            className="text-amber-700 hover:text-amber-900 font-bold flex items-center gap-1 py-1 cursor-pointer bg-amber-50 px-2 rounded-lg border border-amber-200"
+            title="Panduan jika hasil print struk bermasalah / eror"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-amber-600" />
+            <span>Solusi Cetak Eror?</span>
+          </button>
+
+          <button
             onClick={onOpenPrinterModal}
             className="text-blue-700 hover:text-blue-900 font-semibold flex items-center gap-1 py-1 cursor-pointer"
           >
             <Settings className="w-3.5 h-3.5" />
-            <span>Pengaturan Printer ({printerConfig.paperWidth}mm)</span>
+            <span>Printer ({printerConfig.paperWidth}mm)</span>
           </button>
         </div>
       </div>
+
+      {/* Modal Panduan Mengatasi Print Struk Eror */}
+      {showGuideModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-[500px] w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-neutral-200">
+            <div className="bg-[#0B1E3A] text-white p-4 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-400 text-[#0B1E3A] flex items-center justify-center font-black">
+                  <AlertCircle className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h4 className="font-black text-sm">Panduan Solusi Cetak Struk Eror</h4>
+                  <p className="text-[11px] text-white/70">Untuk Printer Thermal EPPOS 58 / POS-58 / VSC</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowGuideModal(false)}
+                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-3.5 text-xs text-[#0B1E3A]">
+              {/* Point 1: Destination Printer */}
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 space-y-1">
+                <div className="font-black text-blue-950 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px]">1</span>
+                  <span>Pilih Printer Tujuan (Destination) yang Tepat</span>
+                </div>
+                <p className="text-[11px] text-blue-900 leading-relaxed">
+                  Saat jendela print muncul di Google Chrome / Edge, pastikan <strong>Destination / Tujuan</strong> diganti ke nama printer thermal Anda (contoh: <strong>POS-58</strong>, <strong>EPPOS 58</strong>, atau <strong>Generic / Text Only</strong>). Jangan pilih &quot;Save as PDF&quot; atau printer kantor A4 biasa.
+                </p>
+              </div>
+
+              {/* Point 2: Margins & Paper Size */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 space-y-1">
+                <div className="font-black text-emerald-950 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px]">2</span>
+                  <span>Atur Margin ke &quot;None&quot; &amp; Paper Size 58mm</span>
+                </div>
+                <ul className="text-[11px] text-emerald-900 list-disc list-inside space-y-1 leading-relaxed pl-1">
+                  <li><strong>Paper size:</strong> Pilih <strong>58mm</strong> / <strong>48mm</strong> / <strong>Roll Paper</strong>.</li>
+                  <li><strong>Margins:</strong> Ubah dari Default menjadi <strong>None (Tanpa Margin)</strong> agar teks tidak terpotong.</li>
+                  <li><strong>Headers and footers:</strong> Hilangkan centang agar tidak muncul link web / tanggal browser di atas dan bawah struk.</li>
+                </ul>
+              </div>
+
+              {/* Point 3: Mode Direct WebUSB / Bluetooth vs Driver Windows */}
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 space-y-1">
+                <div className="font-black text-amber-950 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-amber-600 text-white flex items-center justify-center text-[10px]">3</span>
+                  <span>Jika Menggunakan Kabel USB di Windows</span>
+                </div>
+                <p className="text-[11px] text-amber-900 leading-relaxed">
+                  Jika driver EPPOS 58 sudah diinstal di Windows, port USB dikunci oleh Windows. Pastikan mode printer diatur ke <strong>&quot;Windows Printer (Driver EPPOS 58)&quot;</strong> (bukan Direct WebUSB), lalu cetak melalui jendela browser.
+                </p>
+              </div>
+
+              {/* Point 4: Opsi Alternatif Cepat */}
+              <div className="bg-neutral-100 rounded-2xl p-3 space-y-1.5">
+                <div className="font-black text-neutral-800 text-[11px]">Alternatif Jika Printer Sedang Offline:</div>
+                <div className="grid grid-cols-2 gap-2 text-[10.5px]">
+                  <button
+                    onClick={() => {
+                      setShowGuideModal(false);
+                      handleDownloadPNG();
+                    }}
+                    className="p-2 rounded-xl bg-white border border-neutral-300 font-bold hover:bg-neutral-50 text-center cursor-pointer"
+                  >
+                    📸 Download PNG
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowGuideModal(false);
+                      handleShareWA();
+                    }}
+                    className="p-2 rounded-xl bg-[#25D366] text-white font-bold hover:bg-[#1ebe5a] text-center cursor-pointer"
+                  >
+                    💬 Kirim ke WhatsApp
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-neutral-50 border-t border-neutral-200 flex justify-end">
+              <button
+                onClick={() => setShowGuideModal(false)}
+                className="px-4 py-2 bg-[#0B1E3A] hover:bg-black text-white text-xs font-bold rounded-xl cursor-pointer"
+              >
+                Saya Mengerti
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
