@@ -18,20 +18,25 @@ import * as XLSX from 'xlsx';
 
 interface KatalogTabProps {
   products: ProductItem[];
-  setProducts: React.Dispatch<React.SetStateAction<ProductItem[]>>;
+  onAddProduct: (prod: ProductItem) => Promise<void>;
+  onEditProduct: (prod: ProductItem) => Promise<void>;
+  onDeleteProduct: (id: string, prodName: string) => Promise<void>;
   onResetDefault: () => void;
   onShowToast: (msg: string) => void;
 }
 
 export const KatalogTab: React.FC<KatalogTabProps> = ({
   products,
-  setProducts,
+  onAddProduct,
+  onEditProduct,
+  onDeleteProduct,
   onResetDefault,
   onShowToast,
 }) => {
   const [selectedCat, setSelectedCat] = useState<ProductCategory | 'Semua'>('Semua');
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New product form state
   const [name, setName] = useState('');
@@ -65,52 +70,55 @@ export const KatalogTab: React.FC<KatalogTabProps> = ({
     setIsAddingNew(false);
   };
 
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       onShowToast('Nama produk tidak boleh kosong');
       return;
     }
 
-    if (isAddingNew) {
-      const newProd: ProductItem = {
-        id: `prod_${Date.now()}`,
-        name: name.trim(),
-        category,
-        price: Number(price),
-        unit: unit.trim(),
-        popular,
-        description: description.trim(),
-      };
-      setProducts((prev) => [...prev, newProd]);
-      onShowToast(`Produk ${newProd.name} berhasil ditambahkan`);
-    } else if (editingProduct) {
-      setProducts((prev) =>
-        prev.map((p) =>
-          p.id === editingProduct.id
-            ? {
-                ...p,
-                name: name.trim(),
-                category,
-                price: Number(price),
-                unit: unit.trim(),
-                popular,
-                description: description.trim(),
-              }
-            : p
-        )
-      );
-      onShowToast(`Produk ${name} diperbarui`);
+    setIsSubmitting(true);
+    try {
+      if (isAddingNew) {
+        const newProd: ProductItem = {
+          id: `prod_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          name: name.trim(),
+          category,
+          price: Number(price),
+          unit: unit.trim(),
+          popular,
+          description: description.trim(),
+        };
+        await onAddProduct(newProd);
+      } else if (editingProduct) {
+        const updatedProd: ProductItem = {
+          ...editingProduct,
+          name: name.trim(),
+          category,
+          price: Number(price),
+          unit: unit.trim(),
+          popular,
+          description: description.trim(),
+        };
+        await onEditProduct(updatedProd);
+      }
+      setIsAddingNew(false);
+      setEditingProduct(null);
+    } catch (err) {
+      console.error('Error saving product:', err);
+      onShowToast('Gagal menyimpan produk ke Cloud.');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setIsAddingNew(false);
-    setEditingProduct(null);
   };
 
-  const handleDelete = (id: string, prodName: string) => {
+  const handleDelete = async (id: string, prodName: string) => {
     if (window.confirm(`Hapus produk "${prodName}" dari katalog?`)) {
-      setProducts((prev) => prev.filter((p) => p.id !== id));
-      onShowToast(`Produk "${prodName}" dihapus`);
+      try {
+        await onDeleteProduct(id, prodName);
+      } catch (err) {
+        console.error('Error deleting product:', err);
+      }
     }
   };
 
@@ -384,9 +392,10 @@ export const KatalogTab: React.FC<KatalogTabProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-[#0B1E3A] hover:bg-black text-white font-bold transition shadow-sm"
+                  disabled={isSubmitting}
+                  className="flex-1 py-2.5 rounded-xl bg-[#0B1E3A] hover:bg-black text-white font-bold transition shadow-sm disabled:opacity-50"
                 >
-                  Simpan Produk
+                  {isSubmitting ? 'Menyimpan...' : 'Simpan Produk'}
                 </button>
               </div>
             </form>

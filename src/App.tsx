@@ -20,6 +20,8 @@ import {
   subscribeToProducts,
   saveTransactionToCloud,
   deleteTransactionFromCloud,
+  saveProductToCloud,
+  deleteProductFromCloud,
   saveAllProductsToCloud,
   testFirestoreConnection,
 } from './utils/firebase';
@@ -146,11 +148,26 @@ export default function App() {
 
     const unsubProds = subscribeToProducts((cloudProds, isSnapshotEmpty) => {
       if (isSnapshotEmpty) {
-        // Jika koleksi produk di cloud masih kosong, unggah katalog default agar HP langsung menerima
+        // Jika koleksi produk di cloud masih kosong, unggah katalog default ke Cloud
         console.log('Database produk cloud kosong, mengunggah katalog default ke Cloud...');
         saveAllProductsToCloud(products, userEmail);
       } else if (cloudProds && cloudProds.length > 0) {
         setProducts(cloudProds);
+        // Cek jika ada produk lokal di localStorage yang belum masuk ke Cloud
+        try {
+          const localSavedRaw = localStorage.getItem('wigata_products');
+          if (localSavedRaw) {
+            const localSaved: ProductItem[] = JSON.parse(localSavedRaw);
+            const cloudIds = new Set(cloudProds.map((p) => p.id));
+            const unsynced = localSaved.filter((p) => !cloudIds.has(p.id));
+            if (unsynced.length > 0) {
+              console.log(`Mengunggah ${unsynced.length} produk lokal yang belum ada di Cloud...`);
+              unsynced.forEach((p) => saveProductToCloud(p, userEmail));
+            }
+          }
+        } catch (e) {
+          console.warn('Error checking unsynced products:', e);
+        }
       }
     });
 
@@ -298,19 +315,47 @@ export default function App() {
     showToast(`Nota ${updatedTrx.noNota} berhasil dilunasi!`);
   };
 
-  const handleUpdateProducts: React.Dispatch<React.SetStateAction<ProductItem[]>> = (action) => {
+  const handleAddProduct = async (newProd: ProductItem) => {
     setProducts((prev) => {
-      const next = typeof action === 'function' ? action(prev) : action;
-      saveAllProductsToCloud(next, userEmail);
-      return next;
+      const exists = prev.some((p) => p.id === newProd.id);
+      return exists ? prev.map((p) => (p.id === newProd.id ? newProd : p)) : [...prev, newProd];
     });
-    showToast('Katalog diperbarui di semua komputer.');
+    const ok = await saveProductToCloud(newProd, userEmail);
+    if (ok) {
+      showToast(`Produk "${newProd.name}" tersimpan di Cloud & semua perangkat!`);
+    } else {
+      showToast(`Produk "${newProd.name}" tersimpan secara lokal.`);
+    }
+  };
+
+  const handleEditProduct = async (prod: ProductItem) => {
+    setProducts((prev) => prev.map((p) => (p.id === prod.id ? prod : p)));
+    const ok = await saveProductToCloud(prod, userEmail);
+    if (ok) {
+      showToast(`Produk "${prod.name}" diperbarui di Cloud & semua perangkat!`);
+    } else {
+      showToast(`Produk "${prod.name}" diperbarui secara lokal.`);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string, prodName: string) => {
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+    const ok = await deleteProductFromCloud(id);
+    if (ok) {
+      showToast(`Produk "${prodName}" dihapus dari Cloud & semua perangkat.`);
+    }
+  };
+
+  const handleImportProducts = async (imported: ProductItem[]) => {
+    setProducts(imported);
+    await saveAllProductsToCloud(imported, userEmail);
+    showToast(`${imported.length} produk diimpor & disinkronkan ke Cloud.`);
   };
 
   const handleResetCatalog = async () => {
     setProducts(CATALOG_PRODUCTS);
     await saveAllProductsToCloud(CATALOG_PRODUCTS, userEmail);
-    showToast('Katalog direset ke default.');
+    showToast('Katalog direset ke default dan disinkronkan.');
   };
 
   return (
@@ -368,7 +413,9 @@ export default function App() {
         {activeTab === 'katalog' && (
           <KatalogTab
             products={products}
-            setProducts={handleUpdateProducts}
+            onAddProduct={handleAddProduct}
+            onEditProduct={handleEditProduct}
+            onDeleteProduct={handleDeleteProduct}
             onResetDefault={handleResetCatalog}
             onShowToast={showToast}
           />
@@ -400,10 +447,7 @@ export default function App() {
         onUpdateConfig={(cfg) => setSyncConfig((prev) => ({ ...prev, ...cfg }))}
         transactions={transactions}
         products={products}
-        onImportProducts={(imported) => {
-          handleUpdateProducts(imported);
-          showToast(`${imported.length} produk diupdate dan disinkronkan ke cloud`);
-        }}
+        onImportProducts={handleImportProducts}
         onShowToast={showToast}
       />
 

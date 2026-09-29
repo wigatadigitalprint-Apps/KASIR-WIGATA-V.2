@@ -10,6 +10,7 @@ import {
   deleteDoc,
   getDocFromServer,
   getFirestore,
+  writeBatch,
   Firestore
 } from 'firebase/firestore';
 import {
@@ -172,6 +173,14 @@ export const deleteTransactionFromCloud = async (transactionId: string): Promise
 };
 
 // Firestore sync for Products - DIRECT REAL-TIME SYNC
+const CATEGORY_PRIORITY: Record<string, number> = {
+  'Meteran': 1,
+  'A3+': 2,
+  'Nota Rim': 3,
+  'Stempel': 4,
+  'Cutting': 5,
+};
+
 export const subscribeToProducts = (
   callback: (products: ProductItem[], isSnapshotEmpty: boolean) => void
 ) => {
@@ -189,6 +198,13 @@ export const subscribeToProducts = (
         if (p && p.id) {
           list.push(p);
         }
+      });
+      // Sort predictably by category priority, then name
+      list.sort((a, b) => {
+        const pA = CATEGORY_PRIORITY[a.category] || 99;
+        const pB = CATEGORY_PRIORITY[b.category] || 99;
+        if (pA !== pB) return pA - pB;
+        return a.name.localeCompare(b.name);
       });
       callback(list, false);
     },
@@ -226,9 +242,21 @@ export const saveAllProductsToCloud = async (
   userOrEmail?: User | null | string
 ): Promise<boolean> => {
   try {
+    const author =
+      typeof userOrEmail === 'string'
+        ? userOrEmail
+        : userOrEmail?.email || userOrEmail?.displayName || 'Kasir Wigata';
+
+    const batch = writeBatch(db);
     for (const prod of products) {
-      await saveProductToCloud(prod, userOrEmail);
+      const data = sanitizeForFirestore({
+        ...prod,
+        updatedAt: new Date().toISOString(),
+        updatedBy: author,
+      });
+      batch.set(doc(db, 'products', prod.id), data, { merge: true });
     }
+    await batch.commit();
     return true;
   } catch (error) {
     console.error('Batch save products error:', error);

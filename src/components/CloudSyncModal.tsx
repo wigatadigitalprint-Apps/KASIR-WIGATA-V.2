@@ -57,141 +57,131 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-neutral-200 overflow-hidden">
-        {/* Header */}
-        <div className="bg-[#0B1E3A] text-white p-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 flex items-center justify-center">
-              <Cloud className="w-5 h-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-neutral-200 overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Compact Header */}
+        <div className="bg-[#0B1E3A] text-white px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 flex items-center justify-center">
+              <Cloud className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-black text-base flex items-center gap-1.5">
-                <span>Sinkronisasi Multi-Komputer (Cloud)</span>
-                <span className="bg-emerald-500 text-white text-[9px] px-2 py-0.5 rounded-full font-bold uppercase">
+              <div className="flex items-center gap-1.5 leading-none">
+                <span className="font-extrabold text-sm">Cloud Sync Multi-PC & HP</span>
+                <span className="bg-emerald-500 text-white text-[8.5px] px-1.5 py-0.5 rounded-full font-bold uppercase">
                   Aktif
                 </span>
-              </h3>
-              <p className="text-[11px] text-white/70">
-                Database Cloud Firestore Real-time Wigata POS
+              </div>
+              <p className="text-[10px] text-white/70 mt-0.5">
+                Database Cloud Firestore Real-time
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl hover:bg-white/10 text-white/70 hover:text-white transition cursor-pointer"
+            className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-5 text-sm">
-          {/* Status Box */}
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <div className="font-black text-emerald-950 text-sm">
-                Cloud Database Terhubung Otomatis
-              </div>
-              <div className="text-xs text-emerald-800 leading-relaxed">
-                Anda <strong>tidak perlu lagi login popup</strong> yang diblokir domain. Setiap kali Anda membuat nota baru atau mengubah harga di kasirwigata.netlify.app, data otomatis tersimpan di Cloud dan langsung muncul di komputer lain dalam hitungan detik.
-              </div>
+        {/* Content Body */}
+        <div className="p-4 space-y-3 overflow-y-auto text-xs">
+          {/* Status Alert Box */}
+          <div className="bg-emerald-50/90 border border-emerald-200 rounded-xl p-2.5 flex items-center gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <div className="text-[11px] text-emerald-900 leading-tight">
+              <strong>Database Cloud Terhubung Real-Time.</strong> Penambahan nota &amp; produk di satu perangkat langsung tersinkron ke perangkat lain.
             </div>
           </div>
 
-          {/* Email / ID Toko Wigata */}
-          <div className="space-y-1.5">
-            <label className="font-bold text-xs text-[#0B1E3A] flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-blue-600" />
-              <span>Email Akun Google / Pemilik Toko:</span>
+          {/* Quick Stats Grid */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-2.5 flex items-center justify-between">
+              <div>
+                <div className="text-[10.5px] text-neutral-500 font-semibold flex items-center gap-1">
+                  <Database className="w-3 h-3 text-amber-500" />
+                  <span>Nota Cloud</span>
+                </div>
+                <div className="text-base font-black text-[#0B1E3A]">{transactions.length}</div>
+              </div>
+              <span className="text-[9px] font-bold text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded">Sinkron</span>
+            </div>
+
+            <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-2.5 flex items-center justify-between">
+              <div>
+                <div className="text-[10.5px] text-neutral-500 font-semibold flex items-center gap-1">
+                  <Server className="w-3 h-3 text-blue-500" />
+                  <span>Produk Cloud</span>
+                </div>
+                <div className="text-base font-black text-[#0B1E3A]">{products.length}</div>
+              </div>
+              <span className="text-[9px] font-bold text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">Aktif</span>
+            </div>
+          </div>
+
+          {/* Share Link to HP */}
+          <div className="bg-blue-50/70 border border-blue-200 rounded-xl p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-[11px] text-blue-950 flex items-center gap-1">
+                <Laptop className="w-3.5 h-3.5 text-blue-600" />
+                <span>Buka di HP atau Komputer Lain:</span>
+              </span>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href);
+                  onShowToast('Link disalin! Kirim via WA untuk dibuka di HP.');
+                }}
+                className="text-[10.5px] bg-blue-600 hover:bg-blue-700 text-white font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition shadow-xs"
+              >
+                <ExternalLink className="w-3 h-3" />
+                <span>Salin Link</span>
+              </button>
+            </div>
+            <p className="text-[10.5px] text-blue-900 leading-relaxed">
+              Buka link yang sama di Chrome/Safari HP. Data otomatis tersambung ke database yang sama.
+            </p>
+          </div>
+
+          {/* Email Akun / Kasir */}
+          <div className="space-y-1">
+            <label className="font-bold text-[10.5px] text-[#0B1E3A] flex items-center gap-1">
+              <Mail className="w-3 h-3 text-neutral-500" />
+              <span>Email Akun / Kasir:</span>
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
               <input
                 type="email"
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
                 placeholder="wigatadigitalprint@gmail.com"
-                className="flex-1 px-3 py-2 text-xs border border-neutral-300 rounded-xl focus:outline-none focus:border-blue-600 bg-neutral-50"
+                className="flex-1 px-2.5 py-1.5 text-xs border border-neutral-300 rounded-lg focus:outline-none focus:border-blue-600 bg-neutral-50"
               />
               <button
                 onClick={handleSaveEmail}
-                className="bg-[#0B1E3A] hover:bg-black text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
+                className="bg-[#0B1E3A] hover:bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
               >
-                <Save className="w-3.5 h-3.5" />
+                <Save className="w-3 h-3" />
                 <span>Simpan</span>
               </button>
             </div>
-            <p className="text-[10.5px] text-neutral-500">
-              Email ini digunakan sebagai tanda tangan pengubah nota pada log riwayat transaksi.
-            </p>
-          </div>
-
-          {/* Cloud Stats */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-3 text-center">
-              <div className="text-xl font-black text-[#0B1E3A]">{transactions.length}</div>
-              <div className="text-[11px] text-neutral-500 font-semibold flex items-center justify-center gap-1 mt-0.5">
-                <Database className="w-3 h-3 text-amber-500" />
-                <span>Nota di Cloud</span>
-              </div>
-            </div>
-            <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-3 text-center">
-              <div className="text-xl font-black text-[#0B1E3A]">{products.length}</div>
-              <div className="text-[11px] text-neutral-500 font-semibold flex items-center justify-center gap-1 mt-0.5">
-                <Server className="w-3 h-3 text-blue-500" />
-                <span>Produk Sinkron</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Cara Pakai di HP & Komputer Lain */}
-          <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 space-y-2.5">
-            <div className="font-bold text-xs text-blue-950 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Laptop className="w-4 h-4 text-blue-600" />
-                <span>Buka di HP atau Komputer Lain:</span>
-              </div>
-              <button
-                onClick={() => {
-                  const url = window.location.href;
-                  navigator.clipboard.writeText(url);
-                  onShowToast('Link aplikasi disalin ke clipboard! Kirim ke WA untuk dibuka di HP.');
-                }}
-                className="text-[11px] bg-blue-600 hover:bg-blue-700 text-white font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition shadow-xs"
-              >
-                <ExternalLink className="w-3 h-3" />
-                <span>Salin Link Web</span>
-              </button>
-            </div>
-            <ol className="text-xs text-blue-900 space-y-1.5 list-decimal list-inside leading-relaxed pl-1">
-              <li>
-                Pastikan membuka <strong>URL web aplikasi yang sama</strong> di browser Chrome/Safari pada HP atau komputer lain.
-              </li>
-              <li>
-                Begitu halaman terbuka, sistem otomatis memuat seluruh nota dan produk dari Database Cloud Firestore Wigata.
-              </li>
-              <li>
-                Setiap kali transaksi baru disimpan atau nota dilunasi di HP, layar komputer kasir akan <strong>otomatis terupdate secara langsung</strong> tanpa perlu refresh manual.
-              </li>
-            </ol>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="bg-neutral-50 border-t border-neutral-200 p-4 flex items-center justify-between">
+        {/* Compact Footer */}
+        <div className="bg-neutral-50 border-t border-neutral-200 px-4 py-2.5 flex items-center justify-between gap-2">
           <button
             onClick={handleSyncNow}
             disabled={isSyncing}
-            className="px-4 py-2.5 rounded-xl text-xs font-bold bg-[#FFD23F] hover:brightness-95 text-[#0B1E3A] flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#FFD23F] hover:brightness-95 text-[#0B1E3A] flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'Menyinkronkan...' : 'Upload & Sinkron Ulang Semua'}</span>
+            <span>{isSyncing ? 'Menyinkronkan...' : 'Upload & Sinkron Ulang'}</span>
           </button>
 
           <button
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl text-xs font-bold bg-neutral-200 hover:bg-neutral-300 text-neutral-800 cursor-pointer"
+            className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-neutral-200 hover:bg-neutral-300 text-neutral-800 cursor-pointer"
           >
             Tutup
           </button>
