@@ -35,27 +35,6 @@ import { ExcelSyncModal } from './components/ExcelSyncModal';
 import { DeployGuideModal } from './components/DeployGuideModal';
 import { CloudSyncModal } from './components/CloudSyncModal';
 
-// Helpers to permanently track user-deleted transaction IDs (preventing auto-sync resurrection)
-const getDeletedTrxIds = (): Set<string> => {
-  try {
-    const raw = localStorage.getItem('wigata_deleted_trx_ids');
-    if (raw) return new Set(JSON.parse(raw));
-  } catch {
-    // ignore
-  }
-  return new Set();
-};
-
-const markTrxAsDeleted = (id: string) => {
-  try {
-    const set = getDeletedTrxIds();
-    set.add(id);
-    localStorage.setItem('wigata_deleted_trx_ids', JSON.stringify(Array.from(set)));
-  } catch {
-    // ignore
-  }
-};
-
 export default function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<'kasir' | 'riwayat' | 'laporan' | 'katalog'>('kasir');
@@ -133,20 +112,9 @@ export default function App() {
 
     const unsubTrans = subscribeToTransactions((cloudTrans) => {
       setIsCloudSyncing(false);
-      const deletedIds = getDeletedTrxIds();
-
-      // Filter transaksi yang sudah dihapus oleh kasir
-      const validCloudTrans = (cloudTrans || []).filter((t) => !deletedIds.has(t.id));
-
-      // Jika di cloud masih ada dokumen yang sudah dihapus lokal, bersihkan dari cloud
-      const lingeringDeleted = (cloudTrans || []).filter((t) => deletedIds.has(t.id));
-      if (lingeringDeleted.length > 0) {
-        lingeringDeleted.forEach((t) => deleteTransactionFromCloud(t.id));
-      }
-
-      setTransactions(validCloudTrans);
+      setTransactions(cloudTrans || []);
       try {
-        localStorage.setItem('wigata_transactions', JSON.stringify(validCloudTrans));
+        localStorage.setItem('wigata_transactions', JSON.stringify(cloudTrans || []));
       } catch {
         // ignore
       }
@@ -154,25 +122,15 @@ export default function App() {
 
     const unsubProds = subscribeToProducts((cloudProds, isSnapshotEmpty) => {
       if (isSnapshotEmpty) {
-        // Jika koleksi produk di cloud masih kosong, unggah katalog default ke Cloud
+        // Jika koleksi produk di cloud masih kosong, semai katalog default ke Cloud
         console.log('Database produk cloud kosong, mengunggah katalog default ke Cloud...');
         saveAllProductsToCloud(products, userEmail);
       } else if (cloudProds && cloudProds.length > 0) {
         setProducts(cloudProds);
-        // Cek jika ada produk lokal di localStorage yang belum masuk ke Cloud
         try {
-          const localSavedRaw = localStorage.getItem('wigata_products');
-          if (localSavedRaw) {
-            const localSaved: ProductItem[] = JSON.parse(localSavedRaw);
-            const cloudIds = new Set(cloudProds.map((p) => p.id));
-            const unsynced = localSaved.filter((p) => !cloudIds.has(p.id));
-            if (unsynced.length > 0) {
-              console.log(`Mengunggah ${unsynced.length} produk lokal yang belum ada di Cloud...`);
-              unsynced.forEach((p) => saveProductToCloud(p, userEmail));
-            }
-          }
-        } catch (e) {
-          console.warn('Error checking unsynced products:', e);
+          localStorage.setItem('wigata_products', JSON.stringify(cloudProds));
+        } catch {
+          // ignore
         }
       }
     });
@@ -240,10 +198,9 @@ export default function App() {
   // Manual Full Cloud Sync
   const handleManualSyncAll = async () => {
     setIsCloudSyncing(true);
-    const deletedIds = getDeletedTrxIds();
     try {
       await saveAllProductsToCloud(products, userEmail);
-      const validToSync = transactions.filter((t) => !deletedIds.has(t.id));
+      const validToSync = transactions.filter((t) => !t.isDeleted);
       for (const t of validToSync) {
         await saveTransactionToCloud(t, userEmail);
       }
@@ -300,10 +257,7 @@ export default function App() {
   };
 
   const handleDeleteTransaction = async (id: string) => {
-    // 1. Catat ke daftar ID terhapus agar tidak pernah ter-resurrect
-    markTrxAsDeleted(id);
-
-    // 2. Hapus langsung dari memori state & localStorage
+    // 1. Hapus langsung dari memori state & localStorage
     setTransactions((prev) => {
       const next = prev.filter((t) => t.id !== id);
       try {
@@ -314,7 +268,7 @@ export default function App() {
       return next;
     });
 
-    // 3. Hapus dari database Cloud Firestore
+    // 2. Hapus dari database Cloud Firestore (ditandai isDeleted: true sehingga semua perangkat seketika menyembunyikannya)
     const ok = await deleteTransactionFromCloud(id);
     if (ok) {
       showToast('Nota transaksi berhasil dihapus dari Cloud & semua perangkat.');

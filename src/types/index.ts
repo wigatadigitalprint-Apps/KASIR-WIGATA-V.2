@@ -10,6 +10,8 @@ export interface ProductItem {
   category: ProductCategory;
   popular?: boolean;
   description?: string;
+  isDeleted?: boolean;
+  deletedAt?: string;
 }
 
 export interface FinishingOptions {
@@ -79,6 +81,8 @@ export interface Transaction {
   createdAt?: string;
   updatedAt?: string;
   updatedBy?: string;
+  isDeleted?: boolean;
+  deletedAt?: string;
 }
 
 export interface PrinterConfig {

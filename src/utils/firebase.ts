@@ -120,7 +120,7 @@ export const subscribeToTransactions = (
       const list: Transaction[] = [];
       snapshot.forEach((docSnap) => {
         const item = docSnap.data() as Transaction;
-        if (item && item.id) {
+        if (item && item.id && !item.isDeleted) {
           list.push(item);
         }
       });
@@ -150,6 +150,7 @@ export const saveTransactionToCloud = async (
 
     const cleanTrans = sanitizeForFirestore({
       ...transaction,
+      isDeleted: false,
       updatedAt: new Date().toISOString(),
       updatedBy: author,
     });
@@ -164,7 +165,15 @@ export const saveTransactionToCloud = async (
 
 export const deleteTransactionFromCloud = async (transactionId: string): Promise<boolean> => {
   try {
-    await deleteDoc(doc(db, 'transactions', transactionId));
+    await setDoc(
+      doc(db, 'transactions', transactionId),
+      {
+        id: transactionId,
+        isDeleted: true,
+        deletedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
     return true;
   } catch (error) {
     console.error('Delete transaction error:', error);
@@ -195,7 +204,7 @@ export const subscribeToProducts = (
       const list: ProductItem[] = [];
       snapshot.forEach((docSnap) => {
         const p = docSnap.data() as ProductItem;
-        if (p && p.id) {
+        if (p && p.id && !p.isDeleted) {
           list.push(p);
         }
       });
@@ -226,6 +235,7 @@ export const saveProductToCloud = async (
 
     const data = sanitizeForFirestore({
       ...product,
+      isDeleted: false,
       updatedAt: new Date().toISOString(),
       updatedBy: author,
     });
@@ -251,6 +261,7 @@ export const saveAllProductsToCloud = async (
     for (const prod of products) {
       const data = sanitizeForFirestore({
         ...prod,
+        isDeleted: false,
         updatedAt: new Date().toISOString(),
         updatedBy: author,
       });
@@ -264,9 +275,17 @@ export const saveAllProductsToCloud = async (
   }
 };
 
-export const deleteProductFromCloud = async (productId: string) => {
+export const deleteProductFromCloud = async (productId: string): Promise<boolean> => {
   try {
-    await deleteDoc(doc(db, 'products', productId));
+    await setDoc(
+      doc(db, 'products', productId),
+      {
+        id: productId,
+        isDeleted: true,
+        deletedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
     return true;
   } catch (error) {
     console.error('Delete product error:', error);
